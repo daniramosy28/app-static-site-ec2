@@ -1,85 +1,32 @@
-# VPC
-resource "aws_vpc" "vpc" {
-    cidr_block           = "10.0.0.0/16"
-    enable_dns_hostnames = "true"
+# MODULES ORCHESTRATOR
+
+module "network" {
+    source               = "./modules/network"
+    vpc_cidr             = "${var.vpc_cidr}"
+    vpc_az1              = "${var.vpc_az1}"
+    vpc_az2              = "${var.vpc_az2}"
+    vpc_sn_pub_az1_cidr  = "${var.vpc_sn_pub_az1_cidr}"
+    vpc_sn_priv_az1_cidr = "${var.vpc_sn_priv_az1_cidr}"
 }
 
-# INTERNET GATEWAY
-resource "aws_internet_gateway" "igw" {
-    vpc_id = aws_vpc.vpc.id
-}
-
-# SUBNET
-resource "aws_subnet" "sn_public" {
-    vpc_id                  = aws_vpc.vpc.id
-    cidr_block              = "10.0.1.0/24"
-    map_public_ip_on_launch = "true"
-    availability_zone       = "us-east-1a"
-
-}
-
-# ROUTE TABLE
-resource "aws_route_table" "rt_public" {
-    vpc_id = aws_vpc.vpc.id
-
-    route {
-        cidr_block = "0.0.0.0/0"
-        gateway_id = aws_internet_gateway.igw.id
-    }
-}
-
-# SUBNET ASSOCIATION
-resource "aws_route_table_association" "rt_public_To_sn_public" {
-  subnet_id      = aws_subnet.sn_public.id
-  route_table_id = aws_route_table.rt_public.id
-}
-
-# SECURITY GROUP
-resource "aws_security_group" "sg_public" {
-    name        = "sg_public"
-    vpc_id      = aws_vpc.vpc.id
-    
-    egress {
-        from_port   = 0
-        to_port     = 0
-        protocol    = "-1"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-    ingress {
-        from_port   = 0
-        to_port     = 0
-        protocol    = "-1"
-        cidr_blocks = ["10.0.0.0/16"]
-    }
-
-    ingress {
-        from_port   = 22
-        to_port     = 22
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-    
-    ingress {
-        description = "TCP/80 from All"
-        from_port   = 80
-        to_port     = 80
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-}
-
-# EC2 INSTANCE
-
-data "template_file" "user_data" {
-    template = "${file("./scripts/user_data.sh")}"
-}
-
-resource "aws_instance" "instance" {
-    ami                    = "ami-02e136e904f3da870"
-    instance_type          = "t2.micro"
-    subnet_id              = aws_subnet.sn_public.id
-    vpc_security_group_ids = [aws_security_group.sg_public.id]
-    user_data              = "${base64encode(data.template_file.user_data.rendered)}"
+module "compute" {
+    source                   = "./modules/compute"
+    ec2_lt_name              = "${var.ec2_lt_name}"
+    ec2_lt_ami               = "${var.ec2_lt_ami}"
+    ec2_lt_instance_type     = "${var.ec2_lt_instance_type}"
+    ec2_lt_ssh_key_name      = "${var.ec2_lt_ssh_key_name}"
+    ec2_lb_name              = "${var.ec2_lb_name}"
+    ec2_lb_tg_name           = "${var.ec2_lb_tg_name}"
+    ec2_asg_name             = "${var.ec2_asg_name}"
+    ec2_asg_desired_capacity = "${var.ec2_asg_desired_capacity}"
+    ec2_asg_min_size         = "${var.ec2_asg_min_size}"
+    ec2_asg_max_size         = "${var.ec2_asg_max_size}"
+    vpc_cidr                 = "${var.vpc_cidr}"
+    vpc_id                   = "${module.network.vpc_id}"
+    vpc_sn_pub_az1_id        = "${module.network.vpc_sn_pub_az1_id}"
+    vpc_sg_pub_id            = "${module.network.vpc_sg_pub_id}"
+    rds_endpoint             = "${module.database.rds_endpoint}"
+    rds_dbuser               = "${var.rds_dbuser}"
+    rds_dbpassword           = "${var.rds_dbpassword}"
+    rds_dbname               = "${var.rds_dbname}"
 }
