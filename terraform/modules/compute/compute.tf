@@ -1,7 +1,7 @@
 # RESOURCE: EC2 LAUNCH TEMPLATE
 
 data "template_file" "user_data" {
-    template = "${file("./modules/compute/scripts/user_data.sh")}"
+    template = "${file("./scripts/user_data.sh")}"
 }
 
 resource "aws_launch_template" "ec2_lt" {
